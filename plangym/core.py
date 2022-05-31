@@ -122,7 +122,7 @@ class GymEnvironment(BaseEnvironment):
 
     def __init__(
         self,
-        name: str,
+        name: str = None,
         dt: int = 1,
         min_dt: int = 1,
         episodic_live: bool = False,
@@ -130,6 +130,7 @@ class GymEnvironment(BaseEnvironment):
         wrappers: Iterable[wrap_callable] = None,
         delay_init: bool = False,
         states_on_reset: bool = True,
+        init_env_callable: Callable = None,
     ):
         """
         Initialize a :class:`GymEnvironment`.
@@ -164,6 +165,7 @@ class GymEnvironment(BaseEnvironment):
         self.reward_range = None
         self.metadata = None
         self.delay_init = delay_init
+        self._init_env_callable = init_env_callable
         if not delay_init:
             self.init_env()
 
@@ -182,14 +184,19 @@ class GymEnvironment(BaseEnvironment):
     def init_env(self):
         """Initialize the target :class:`gym.Env` instance."""
         # Remove any undocumented wrappers
-        spec = gym_registry.spec(self.name)
-        if hasattr(spec, "max_episode_steps"):
-            setattr(spec, "_max_episode_steps", spec.max_episode_steps)
-        if hasattr(spec, "max_episode_time"):
-            setattr(spec, "_max_episode_time", spec.max_episode_time)
-        spec.max_episode_steps = None
-        spec.max_episode_time = None
-        self.gym_env: gym.Env = spec.make()
+
+        if not self._init_env_callable:
+            spec = gym_registry.spec(self.name)
+            if hasattr(spec, "max_episode_steps"):
+                setattr(spec, "_max_episode_steps", spec.max_episode_steps)
+            if hasattr(spec, "max_episode_time"):
+                setattr(spec, "_max_episode_time", spec.max_episode_time)
+            spec.max_episode_steps = None
+            spec.max_episode_time = None
+            self.gym_env: gym.Env = spec.make()
+        else:
+            self.gym_env: gym.Env = self._init_env_callable()
+
         if self._wrappers is not None:
             self.apply_wrappers(self._wrappers)
         self.action_space = self.gym_env.action_space
